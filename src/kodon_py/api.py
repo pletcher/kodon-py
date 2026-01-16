@@ -8,54 +8,44 @@ def save_to_db(tei_parser: TEIParser):
     if tei_parser.urn is None:
         raise ValueError("Cannot save a document without a URN.")
 
-    # Save document metadata
-    document = models.Document(
-        editionStmt=tei_parser.editionStmt,
-        language=tei_parser.language,
-        publicationStmt=tei_parser.publicationStmt,
-        respStmt=tei_parser.respStmt,
-        sourceDesc=tei_parser.sourceDesc,
-        title=tei_parser.title,
-        urn=tei_parser.urn
-    )
-    database.db_session.add(document)
-    database.db_session.commit()
-
-    # Save textparts and build a mapping of URNs to IDs
-    textpart_id_map = {}
-    for textpart in tei_parser.textparts:
-        textpart = models.Textpart(
-            idx=textpart["index"],
-            location=textpart["location"],
-            n=textpart["n"],
-            subtype=textpart["subtype"],
-            type=textpart["type"],
-            urn=textpart["urn"]
+    try:
+        # Save document metadata
+        document = models.Document(
+            editionStmt=tei_parser.editionStmt,
+            language=tei_parser.language,
+            publicationStmt=tei_parser.publicationStmt,
+            respStmt=tei_parser.respStmt,
+            sourceDesc=tei_parser.sourceDesc,
+            title=tei_parser.title,
+            urn=tei_parser.urn
         )
+        database.db_session.add(document)
 
-        document.textparts.append(textpart)
+        # Save textparts and build a mapping of URNs to IDs
+        textpart_id_map = {}
+        for textpart_data in tei_parser.textparts:
+            textpart = models.Textpart(
+                idx=textpart_data["index"],
+                location=textpart_data["location"],
+                n=textpart_data["n"],
+                subtype=textpart_data["subtype"],
+                type=textpart_data["type"],
+                urn=textpart_data["urn"]
+            )
+
+            document.textparts.append(textpart)
+            database.db_session.flush()
+
+            textpart_id_map[textpart.urn] = textpart.id
+
+        # Save all top-level elements
+        for element in tei_parser.elements:
+            save_element(tei_parser.urn, textpart_id_map, element)
 
         database.db_session.commit()
-
-        textpart_id_map[textpart.get("urn")] = textpart.id
-
-        # # Save tokens associated with this textpart
-        # if "tokens" in textpart:
-        #     for position, token in enumerate(textpart["tokens"]):
-        #         token = models.Token(
-
-        #         )
-        #         insert_token(db,
-        #             token,
-        #             tei_parser.urn,
-        #             textpart_id,
-        #             None,
-        #             position,
-        #         )
-
-    # Save all top-level elements
-    for element in tei_parser.elements:
-        save_element(tei_parser.urn, textpart_id_map, element)
+    except Exception:
+        database.db_session.rollback()
+        raise
 
 
 def save_element(
@@ -77,7 +67,7 @@ def save_element(
     )
 
     database.db_session.add(db_element)
-    database.db_session.commit()
+    database.db_session.flush()
 
     # Process children
     for child in element.get("children", []):
@@ -93,8 +83,6 @@ def save_element(
                 )
 
                 db_element.tokens.append(db_token)
-
-                database.db_session.commit()
         else:
             # Recursively save child element
             save_element(document_urn, textpart_id_map, child, db_element.id)
