@@ -1,0 +1,129 @@
+{# Reading Environment Component #}
+{# Parameters: #}
+{#   current_url - Current page URL #}
+{#   current_passage_urn - URN of the current passage #}
+{#   passages - List of RenderablePassageConfig objects for navigation #}
+{#   text_containers - List of TextContainer objects #}
+{#   comments - List of Comment objects (default: []) #}
+{#   citation_prefix - Prefix for single citations (default: 'v.') #}
+{#   citation_prefix_plural - Prefix for range citations (default: 'vv.') #}
+{#   daisy_ui_theme - DaisyUI theme name (default: 'corporate') #}
+{#   show_commentary_filters - Whether to show filter controls (default: false) #}
+{#   iiif_url - Optional IIIF server URL #}
+{#   heatmap_tooltip - Tooltip text for heatmap toggle #}
+{#   filter_list_tooltip - Tooltip text for filter list #}
+{#   navigation_tooltip - Tooltip text for navigation #}
+{#   table_view_tooltip - Tooltip text for table view toggle #}
+{#   show_heatmap - Whether to show heatmap (default: true) #}
+{#   show_table_view - Whether to show table view (default: false) #}
+{#   selected_urn - Currently selected URN #}
+{#   selected_commentaries - List of selected commentary PIDs #}
+{#   commentary_options - List of filter options #}
+{#   filtered_comments - Comments filtered by selected commentaries #}
+{% set daisy_ui_theme = daisy_ui_theme | default('corporate') %}
+{% set citation_prefix = citation_prefix | default('v.') %}
+{% set citation_prefix_plural = citation_prefix_plural | default('vv.') %}
+{% set show_commentary_filters = show_commentary_filters | default(false) %}
+{% set show_heatmap = show_heatmap | default(true) %}
+{% set show_table_view = show_table_view | default(false) %}
+{% set comments = comments | default([]) %}
+{% set selected_commentaries = selected_commentaries | default([]) %}
+{% set filtered_comments = filtered_comments | default(comments) %}
+
+<article class="mx-auto w-full" data-theme="{{ daisy_ui_theme }}">
+	<div class="col-span-full flex justify-between">
+		<div>
+			{% if selected_urn %}
+				<p class="text-gray-500">Selected URN: {{ selected_urn }}</p>
+			{% endif %}
+		</div>
+		<div class="flex justify-between items-center mb-2">
+			{% if heatmap_tooltip %}
+				{% with text=heatmap_tooltip %}
+					{% include 'Tooltip.html.jinja' %}
+				{% endwith %}
+				<form>
+					<div class="form-control">
+						<label class="label cursor-pointer">
+							<span class="label-text mr-2">Highlight lemmata</span>
+							<input
+								name="heatmap-toggle"
+								type="checkbox"
+								class="toggle"
+								{% if show_heatmap %}checked{% endif %}
+								value="1"
+							/>
+						</label>
+					</div>
+				</form>
+			{% endif %}
+
+			{% if table_view_tooltip %}
+				{% with text=table_view_tooltip %}
+					{% include 'Tooltip.html.jinja' %}
+				{% endwith %}
+				<form>
+					<div class="form-control">
+						<label class="label cursor-pointer">
+							<span class="label-text mr-2">Show table view</span>
+							<input
+								name="table-view-toggle"
+								type="checkbox"
+								class="toggle"
+								{% if show_table_view %}checked{% endif %}
+								value="0"
+							/>
+						</label>
+					</div>
+				</form>
+			{% endif %}
+		</div>
+	</div>
+	<div class="flex h-screen justify-between max-h-256">
+		<section class="flex-2">
+			<div class="flex justify-between items-center mb-2">
+				<h3 class="prose prose-h3 font-semibold text-sm">Navigation</h3>
+				{% if navigation_tooltip %}
+					{% with text=navigation_tooltip %}
+						{% include 'Tooltip.html.jinja' %}
+					{% endwith %}
+				{% endif %}
+			</div>
+			<div>
+				{% include 'Navigation/Navigation.html.jinja' %}
+			</div>
+			{% if show_commentary_filters %}
+				<div class="py-2"></div>
+				<div class="flex justify-between items-center mb-2">
+					<h3 class="prose prose-h3 font-semibold text-sm">Filter Comments</h3>
+					{% if filter_list_tooltip %}
+						{% with text=filter_list_tooltip %}
+							{% include 'Tooltip.html.jinja' %}
+						{% endwith %}
+					{% endif %}
+				</div>
+				{% with options=commentary_options %}
+					{% include 'FilterList.html.jinja' %}
+				{% endwith %}
+			{% endif %}
+		</section>
+		<section class="flex-initial overflow-y-scroll">
+			{% if show_table_view %}
+				{% include 'TabularTextView.html.jinja' %}
+			{% else %}
+				{% for text_container in text_containers %}
+					{% with location_container=text_container %}
+						{% include 'LocationContainer.html.jinja' %}
+					{% endwith %}
+				{% endfor %}
+			{% endif %}
+		</section>
+		<section class="flex-auto overflow-y-scroll max-h-screen">
+			{% for comment in filtered_comments %}
+				{# Generate comment citation - this would typically be done server-side #}
+				{% set comment_citation = citation_prefix ~ ' ' ~ (comment.ctsUrn.integerCitations[0] | join('') if comment.ctsUrn else '') %}
+				{% include 'CollapsibleComment.html.jinja' %}
+			{% endfor %}
+		</section>
+	</div>
+</article>

@@ -1,0 +1,26 @@
+{# Navigation Component #}
+{# Parameters: #}
+{#   passages - List of RenderablePassageConfig objects #}
+{#   current_passage_urn - URN of the currently selected passage #}
+<ul class="menu bg-base-200 p-0">
+	{% for passage in passages %}
+        <li class="rounded-none{% if is_underlined %} bg-secondary{% endif %}">
+            {% if passage.subpassages and passage.subpassages | length > 0 %}
+                <details{% if is_underlined %} open{% endif %}>
+                    <summary>
+                        <span{% if is_underlined %} class="underline"{% endif %}>{{ passage.label | safe }}</span>
+                        {{ passage.ref }}
+                    </summary>
+                    <ul>
+                        {{ loop(passage.subpassages) }}
+                    </ul>
+                </details>
+            {% else %}
+                <a href="{{ passage.url }}">
+                    <span{% if is_underlined %} class="underline"{% endif %}>{{ passage.label | safe }}</span>
+                    {{ passage.ref or '' }}
+                </a>
+            {% endif %}
+        </li>
+	{% endfor %}
+</ul>

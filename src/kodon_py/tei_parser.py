@@ -24,15 +24,6 @@ Usage:
     print(f"Language: {parser.lang}")
     print(f"Textparts: {len(parser.textparts)}")
     print(f"Elements: {len(parser.elements)}")
-
-    # Save to SQLite database
-    parser.save_to_db("output.db")
-
-Database Schema:
-    - documents: Document metadata (URN, language)
-    - textparts: Hierarchical text sections with URNs and locations
-    - elements: TEI elements (paragraphs, notes, etc.) with parent-child relationships
-    - tokens: Individual words/tokens with position and whitespace information
 """
 
 ## TODO
@@ -45,10 +36,7 @@ from xml.sax.handler import ContentHandler
 
 import lxml.sax  # pyright: ignore
 import stanza
-
 from lxml import etree
-
-from kodon_py.tei_parser.database import TEIDatabase
 
 DISABLED_PIPES = ["parser", "ner", "textcat"]
 
@@ -76,7 +64,14 @@ logger.setLevel(logging.DEBUG)
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)
 
-file_handler = logging.FileHandler(f"./tmp/{__name__}.log", mode="w")
+tmp_dir = Path("tmp")
+
+if not tmp_dir.exists():
+    tmp_dir.mkdir()
+
+log_filepath = tmp_dir / Path(f"{__name__}.log")
+
+file_handler = logging.FileHandler(log_filepath, mode="w")
 
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
@@ -141,10 +136,24 @@ def remove_ns_from_attrs(attrs: xmlreader.AttributesNSImpl):
 
 
 class TEIParser(ContentHandler):
-    def __init__(self, filename: Path | str):
-        tree = etree.parse(filename)
+    """
+    The TEIParser holds information from the TEI XML version
+    of a given text.
 
-        self.lang = None
+    The XML structure of the editionStmt,
+    publicationStmt, respStmt, and sourceDesc are stored
+    as strings for later parsing and use.
+    """
+    def __init__(self, filename: Path | str):
+        self.tree = etree.parse(filename)
+
+        self.author = self.get_author()
+        self.editionStmt = self.get_editionStmt()
+        self.language = None
+        self.publicationStmt = self.get_publicationStmt()
+        self.respStmt = self.get_respStmt()
+        self.sourceDesc = self.get_sourceDesc()
+        self.title = self.get_title()
         self.urn = None
 
         self.current_tokens: list[str] = []
@@ -158,7 +167,7 @@ class TEIParser(ContentHandler):
         self.textparts = []
         self.unhandled_elements = set()
 
-        for body in tree.iterfind(".//tei:body", namespaces=NAMESPACES):
+        for body in self.tree.iterfind(".//tei:body", namespaces=NAMESPACES):
             lxml.sax.saxify(body, self)
 
     def add_textpart_to_stack(self, attrs: dict):
@@ -249,9 +258,42 @@ class TEIParser(ContentHandler):
             else:
                 self.elements.append(el)
 
+    def get_author(self):
+        el = self.tree.find(".//tei:author", namespaces=NAMESPACES)
+
+        if el is not None:
+            return etree.tostring(el, encoding="unicode", method="text", xml_declaration=False)
+
+    def get_editionStmt(self):
+        return self.get_stringifiedXML("editionStmt")
+
+    def get_publicationStmt(self):
+        return self.get_stringifiedXML("publicationStmt", False)
+
+    def get_respStmt(self):
+        return self.get_stringifiedXML("respStmt", False)
+
+    def get_sourceDesc(self):
+        return self.get_stringifiedXML("sourceStmt")
+
+    def get_stringifiedXML(self, tagname: str, required=True):
+        el = self.tree.find(f".//tei:{tagname}", namespaces=NAMESPACES)
+
+        if required and el is None:
+            raise ValueError(f"{tagname} is required!")
+
+        if el is not None:
+            return etree.tostring(el, encoding="unicode", xml_declaration=False)
+
+    def get_title(self):
+        el = self.tree.find(".//tei:title", namespaces=NAMESPACES)
+
+        if el is not None:
+            return etree.tostring(el, encoding="unicode", method="text", xml_declaration=False)
+
     def handle_div(self, attrs: dict):
         if attrs["type"] == "edition":
-            self.lang = attrs["lang"]
+            self.language = attrs["lang"]
             self.urn = attrs["n"]
 
         elif attrs["type"] == "textpart":
@@ -392,10 +434,10 @@ class TEIParser(ContentHandler):
     def tokenize(self, s: str):
         doc = None
 
-        if self.lang == "grc":
+        if self.language == "grc":
             doc = greek_tokenizer(s)
 
-        elif self.lang == "la":
+        elif self.language == "la":
             doc = latin_tokenizer(s)
 
         if doc is None:
@@ -407,68 +449,3 @@ class TEIParser(ContentHandler):
                 tokens.append(token)
 
         return tokens
-
-    def save_to_db(self, db_path: str | Path):
-        """Save parsed TEI data to SQLite database."""
-
-        db = TEIDatabase(db_path)
-
-        if self.urn is None:
-            raise ValueError("Cannot save a document without a URN.")
-
-        try:
-            # Save document metadata
-            if self.urn and self.lang:
-                db.insert_document(self.urn, self.lang)
-
-            # Save textparts and build a mapping of URNs to IDs
-            textpart_id_map = {}
-            for textpart in self.textparts:
-                textpart_id = db.insert_textpart(textpart)
-                textpart_id_map[textpart.get("urn")] = textpart_id
-
-                # Save tokens associated with this textpart
-                if "tokens" in textpart:
-                    for position, token in enumerate(textpart["tokens"]):
-                        db.insert_token(
-                            token,
-                            self.urn,
-                            textpart_id,
-                            None,
-                            position,
-                        )
-
-            # Save elements and build a mapping for parent-child relationships
-            element_id_map = {}
-
-            def save_element_recursive(element: dict, parent_id: int | None = None):
-                """Recursively save an element and its children."""
-                textpart_id = textpart_id_map.get(element.get("textpart_urn"))
-
-                element_id = db.insert_element(element, textpart_id, parent_id)
-                element_id_map[element.get("index")] = element_id
-
-                # Process children
-                for child in element.get("children", []):
-                    if child.get("tagname") == "text_run":
-                        # Save tokens in this text run
-                        for position, token in enumerate(child.get("tokens", [])):
-                            db.insert_token(
-                                token,
-                                self.urn,  # pyright: ignore
-                                textpart_id,
-                                element_id,
-                                position,
-                            )
-                    else:
-                        # Recursively save child element
-                        save_element_recursive(child, element_id)
-
-            # Save all top-level elements
-            for element in self.elements:
-                save_element_recursive(element)
-
-            logger.info(f"Successfully saved {self.urn} to database at {db_path}")
-
-        finally:
-            db.close()
