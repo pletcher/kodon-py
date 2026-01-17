@@ -274,13 +274,13 @@ class TEIParser(ContentHandler):
         return self.get_stringifiedXML("respStmt", False)
 
     def get_sourceDesc(self):
-        return self.get_stringifiedXML("sourceStmt")
+        return self.get_stringifiedXML("sourceDesc")
 
     def get_stringifiedXML(self, tagname: str, required=True):
         el = self.tree.find(f".//tei:{tagname}", namespaces=NAMESPACES)
 
         if required and el is None:
-            raise ValueError(f"{tagname} is required!")
+            raise ValueError(f"{tagname} is required! {self.urn}")
 
         if el is not None:
             return etree.tostring(el, encoding="unicode", xml_declaration=False)

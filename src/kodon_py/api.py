@@ -1,9 +1,13 @@
-from kodon_py import database, models
+from sqlalchemy.orm import Session, scoped_session
+
+from kodon_py import models
 from kodon_py.tei_parser import TEIParser
 
 
-def save_to_db(tei_parser: TEIParser):
+def save_to_db(db_session: scoped_session[Session], tei_parser: TEIParser):
     """Save parsed TEI data to SQLite database."""
+
+    models.Base.query = db_session.query_property()
 
     if tei_parser.urn is None:
         raise ValueError("Cannot save a document without a URN.")
@@ -19,7 +23,7 @@ def save_to_db(tei_parser: TEIParser):
             title=tei_parser.title,
             urn=tei_parser.urn
         )
-        database.db_session.add(document)
+        db_session.add(document)
 
         # Save textparts and build a mapping of URNs to IDs
         textpart_id_map = {}
@@ -34,21 +38,22 @@ def save_to_db(tei_parser: TEIParser):
             )
 
             document.textparts.append(textpart)
-            database.db_session.flush()
+            db_session.flush()
 
             textpart_id_map[textpart.urn] = textpart.id
 
         # Save all top-level elements
         for element in tei_parser.elements:
-            save_element(tei_parser.urn, textpart_id_map, element)
+            save_element(db_session, tei_parser.urn, textpart_id_map, element)
 
-        database.db_session.commit()
+        db_session.commit()
     except Exception:
-        database.db_session.rollback()
+        db_session.rollback()
         raise
 
 
 def save_element(
+    db_session: scoped_session[Session],
     document_urn: str,
     textpart_id_map: dict,
     element: dict,
@@ -66,8 +71,8 @@ def save_element(
         urn=element["urn"],
     )
 
-    database.db_session.add(db_element)
-    database.db_session.flush()
+    db_session.add(db_element)
+    db_session.flush()
 
     # Process children
     for child in element.get("children", []):
@@ -85,4 +90,4 @@ def save_element(
                 db_element.tokens.append(db_token)
         else:
             # Recursively save child element
-            save_element(document_urn, textpart_id_map, child, db_element.id)
+            save_element(db_session, document_urn, textpart_id_map, child, db_element.id)

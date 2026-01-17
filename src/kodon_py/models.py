@@ -1,10 +1,9 @@
 from typing import List, Optional
 
 from sqlalchemy import JSON, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
 
-from kodon_py.database import Base
-
+Base = declarative_base()
 
 class Document(Base):
     id: Mapped[int] = mapped_column(primary_key=True)

@@ -3,8 +3,6 @@ import os
 from flask import Flask
 from flask_alembic import Alembic
 
-from kodon_py.database import db_session
-
 
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
@@ -36,6 +34,9 @@ def create_app(test_config=None):
 
     @app.teardown_appcontext
     def shutdown_session(exception=None):
+        from kodon_py import database
+
+        db_session = database.init_db(app.config["DATABASE_PATH"])
         db_session.remove()
 
     return app
