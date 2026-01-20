@@ -35,26 +35,7 @@ from xml.sax import xmlreader
 from xml.sax.handler import ContentHandler
 
 import lxml.sax  # pyright: ignore
-import stanza
 from lxml import etree
-
-DISABLED_PIPES = ["parser", "ner", "textcat"]
-
-greek_tokenizer = stanza.Pipeline(
-    "grc",
-    processors="tokenize",
-    package="perseus",
-    model_dir="./stanza_models",
-    download_method=stanza.DownloadMethod.REUSE_RESOURCES,
-)
-latin_tokenizer = stanza.Pipeline(
-    "la",
-    processors="tokenize",
-    package="perseus",
-    model_dir="./stanza_models",
-    download_method=stanza.DownloadMethod.REUSE_RESOURCES,
-)
-
 
 NAMESPACES = {"tei": "http://www.tei-c.org/ns/1.0"}
 
@@ -145,6 +126,23 @@ class TEIParser(ContentHandler):
     as strings for later parsing and use.
     """
     def __init__(self, filename: Path | str):
+        import stanza
+
+        self.greek_tokenizer = stanza.Pipeline(
+            "grc",
+            processors="tokenize",
+            package="perseus",
+            model_dir="./stanza_models",
+            download_method=stanza.DownloadMethod.REUSE_RESOURCES,
+        )
+        self.latin_tokenizer = stanza.Pipeline(
+            "la",
+            processors="tokenize",
+            package="perseus",
+            model_dir="./stanza_models",
+            download_method=stanza.DownloadMethod.REUSE_RESOURCES,
+        )
+
         self.tree = etree.parse(filename)
 
         self.author = self.get_author()
@@ -435,10 +433,10 @@ class TEIParser(ContentHandler):
         doc = None
 
         if self.language == "grc":
-            doc = greek_tokenizer(s)
+            doc = self.greek_tokenizer(s)
 
         elif self.language == "la":
-            doc = latin_tokenizer(s)
+            doc = self.latin_tokenizer(s)
 
         if doc is None:
             return []
