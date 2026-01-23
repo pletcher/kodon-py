@@ -1,39 +1,41 @@
 from sqlalchemy.orm import Session, scoped_session
 
-from kodon_py import models
+from kodon_py.database import Document, Element, Textpart, Token
 from kodon_py.tei_parser import TEIParser
 
 
 def save_to_db(db_session: scoped_session[Session], tei_parser: TEIParser):
     """Save parsed TEI data to SQLite database."""
-
-    models.Base.query = db_session.query_property()
-
     if tei_parser.urn is None:
         raise ValueError("Cannot save a document without a URN.")
 
     try:
         # Save document metadata
-        document = models.Document(
+        document = Document(
             editionStmt=tei_parser.editionStmt,
             language=tei_parser.language,
             publicationStmt=tei_parser.publicationStmt,
             respStmt=tei_parser.respStmt,
             sourceDesc=tei_parser.sourceDesc,
+            textgroup=tei_parser.author,
             title=tei_parser.title,
-            urn=tei_parser.urn
+            urn=tei_parser.urn,
         )
         db_session.add(document)
 
         # Save textparts and build a mapping of URNs to IDs
         textpart_id_map = {}
         for textpart_data in tei_parser.textparts:
-            textpart = models.Textpart(
+            location = textpart_data.get("location", [])
+            if isinstance(location, list):
+                location = ".".join(location)
+
+            textpart = Textpart(
                 idx=textpart_data["index"],
-                location=textpart_data["location"],
-                n=textpart_data["n"],
-                subtype=textpart_data["subtype"],
-                type=textpart_data["type"],
+                location=location,
+                n=textpart_data.get("n"),
+                subtype=textpart_data.get("subtype"),
+                type=textpart_data.get("type"),
                 urn=textpart_data["urn"]
             )
 
@@ -62,8 +64,15 @@ def save_element(
     """Recursively save an element and its children."""
     textpart_id = textpart_id_map.get(element.get("textpart_urn"))
 
-    db_element = models.Element(
-        attributes=element["attributes"],
+    # Extract attributes (exclude internal keys used by the parser)
+    internal_keys = {
+        "children", "index", "tagname", "textpart_index",
+        "textpart_urn", "urn"
+    }
+    attributes = {k: v for k, v in element.items() if k not in internal_keys}
+
+    db_element = Element(
+        attributes=attributes if attributes else None,
         idx=element["index"],
         parent_id=parent_id,
         tagname=element["tagname"],
@@ -79,12 +88,12 @@ def save_element(
         if child.get("tagname") == "text_run":
             # Save tokens in this text run
             for position, token in enumerate(child.get("tokens", [])):
-                db_token = models.Token(
+                db_token = Token(
                     position=position,
                     text=token["text"],
                     textpart_id=textpart_id,
                     urn=token["urn"],
-                    whitespace=token["whitespace"],
+                    whitespace=token.get("whitespace", False),
                 )
 
                 db_element.tokens.append(db_token)
