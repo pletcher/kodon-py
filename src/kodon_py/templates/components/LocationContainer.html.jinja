@@ -1,0 +1,44 @@
+{# Location Container Component #}
+{# Parameters: #}
+{#   location_container - TextContainer object with children #}
+{#   show_heatmap - Whether to show comment density heatmap #}
+{#   show_location_citation - Whether to show the location citation (default: false) #}
+{#   comments - List of Comment objects #}
+{#   whole_location_comments - Comments on the whole location (computed server-side) #}
+{% set show_location_citation = show_location_citation | default(false) %}
+{% set whole_location_comments = whole_location_comments | default([]) %}
+{% set cts_urn_citations = location_container.urn.split(':')[-1].split('.') if location_container.urn else [] %}
+<div class="rounded-sm">
+	<div class="rounded-sm bg-base-100 flex justify-between">
+		<div>
+			{% for child in location_container.children %}
+				{% if child.speaker %}
+					{% with name=child.speaker %}
+						{% include 'Speaker.html.jinja' %}
+					{% endwith %}
+				{% endif %}
+				{% with text_container=child %}
+					{% include 'ReadableTextContainer.html.jinja' %}
+				{% endwith %}
+			{% endfor %}
+		</div>
+		{% if show_location_citation %}
+			<div class="flex flex-col justify-center">
+				{% if whole_location_comments | length > 0 %}
+					<a
+						href="#"
+						role="button"
+						class="base-content hover:opacity-70 cursor-pointer w-12 text-center inline-block comments-{{ whole_location_comments | length }}{% if show_heatmap %} comment-box-shadow{% endif %} select-none"
+						tabindex="0"
+						data-citation="{{ cts_urn_citations | join('.') }}"
+						data-comment-urns="{{ whole_location_comments | map(attribute='citable_urn') | join(',') }}"
+					>{{ cts_urn_citations | join('.') }}</a>
+				{% else %}
+					<span class="base-content inline-block w-12 text-center select-none">{{ cts_urn_citations | join('.') }}</span>
+				{% endif %}
+			</div>
+		{% endif %}
+	</div>
+</div>
+
+{% include 'styles/comments.html.jinja' %}

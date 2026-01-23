@@ -1,0 +1,57 @@
+{# Readable Text Container Component #}
+{# Parameters: #}
+{#   text_container - TextContainer object with tokens and children #}
+{#   show_heatmap - Whether to show comment density heatmap #}
+{#   comments - List of Comment objects #}
+{# #}
+{# Mapping of tagnames to HTML elements: #}
+{#   head -> h1, l -> span, lb -> span, lg -> div, #}
+{#   p -> p, pb -> p, quote -> blockquote, default -> span #}
+
+{% set tagname = text_container.subtype or text_container.tagname %}
+{% set container_element = container_element | {
+	'head': 'h1',
+	'l': 'span',
+	'lb': 'span',
+	'lg': 'div',
+	'p': 'p',
+	'pb': 'p',
+	'quote': 'blockquote'
+}.get(tagname, 'span') %}
+{% set cts_urn = text_container.urn | default('unknown') %}
+
+<{{ container_element }} class="prose tei-{{ text_container.tagname }}{% if text_container.tagname == 'l' %} indent-hanging{% endif %}" data-urn="{{ cts_urn }}" role="presentation">
+	{% for child in text_container.children %}
+		{% with text_container={'urn': child.urn or text_container.urn} | combine(child) %}
+			{% include 'ReadableTextContainer.html.jinja' %}
+		{% endwith %}
+	{% endfor %}
+
+	{% if text_container.tagname in ['pb', 'lb'] %}
+		<a href="#{{ text_container.n }}">{{ text_container.n }}</a>
+	{% endif %}
+
+	{% if text_container.tagname == 'text_run' and text_container.tokens %}
+		{%- for token in text_container.tokens %}{{ token.text }}{% if token.whitespace %} {% endif %}{%- endfor %}
+	{% endif %}
+
+</{{ container_element }}>
+
+<style>
+	.indent-hanging {
+		text-indent: 2.3rem hanging;
+	}
+	.div {
+		padding-bottom: 1rem;
+	}
+	.tei-l {
+		display: block;
+	}
+	.tei-quote {
+		padding-top: 1rem;
+		text-indent: 2rem;
+	}
+	.quote:last-of-type {
+		padding-bottom: 1rem;
+	}
+</style>

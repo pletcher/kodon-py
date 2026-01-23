@@ -90,33 +90,15 @@
 				{% endif %}
 			</div>
 			<div>
-				{% include 'Navigation/Navigation.html.jinja' %}
+				{% include 'Navigation.html.jinja' %}
 			</div>
-			{% if show_commentary_filters %}
-				<div class="py-2"></div>
-				<div class="flex justify-between items-center mb-2">
-					<h3 class="prose prose-h3 font-semibold text-sm">Filter Comments</h3>
-					{% if filter_list_tooltip %}
-						{% with text=filter_list_tooltip %}
-							{% include 'Tooltip.html.jinja' %}
-						{% endwith %}
-					{% endif %}
-				</div>
-				{% with options=commentary_options %}
-					{% include 'FilterList.html.jinja' %}
-				{% endwith %}
-			{% endif %}
 		</section>
 		<section class="flex-initial overflow-y-scroll">
-			{% if show_table_view %}
-				{% include 'TabularTextView.html.jinja' %}
-			{% else %}
-				{% for text_container in text_containers %}
-					{% with location_container=text_container %}
-						{% include 'LocationContainer.html.jinja' %}
-					{% endwith %}
-				{% endfor %}
-			{% endif %}
+			{% for text_container in text_containers %}
+				{% with location_container=text_container %}
+					{% include 'LocationContainer.html.jinja' %}
+				{% endwith %}
+			{% endfor %}
 		</section>
 		<section class="flex-auto overflow-y-scroll max-h-screen">
 			{% for comment in filtered_comments %}
