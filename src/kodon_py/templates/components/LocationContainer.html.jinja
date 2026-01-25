@@ -14,11 +14,11 @@
 			{% for child in location_container.children %}
 				{% if child.speaker %}
 					{% with name=child.speaker %}
-						{% include 'Speaker.html.jinja' %}
+						{% include 'components/Speaker.html.jinja' %}
 					{% endwith %}
 				{% endif %}
 				{% with text_container=child %}
-					{% include 'ReadableTextContainer.html.jinja' %}
+					{% include 'components/ReadableTextContainer.html.jinja' %}
 				{% endwith %}
 			{% endfor %}
 		</div>
@@ -41,4 +41,4 @@
 	</div>
 </div>
 
-{% include 'styles/comments.html.jinja' %}
+{% include 'components/styles/comments.html.jinja' %}

@@ -40,7 +40,7 @@
 		<div class="flex justify-between items-center mb-2">
 			{% if heatmap_tooltip %}
 				{% with text=heatmap_tooltip %}
-					{% include 'Tooltip.html.jinja' %}
+					{% include 'components/Tooltip.html.jinja' %}
 				{% endwith %}
 				<form>
 					<div class="form-control">
@@ -60,7 +60,7 @@
 
 			{% if table_view_tooltip %}
 				{% with text=table_view_tooltip %}
-					{% include 'Tooltip.html.jinja' %}
+					{% include 'components/Tooltip.html.jinja' %}
 				{% endwith %}
 				<form>
 					<div class="form-control">
@@ -85,18 +85,18 @@
 				<h3 class="prose prose-h3 font-semibold text-sm">Navigation</h3>
 				{% if navigation_tooltip %}
 					{% with text=navigation_tooltip %}
-						{% include 'Tooltip.html.jinja' %}
+						{% include 'components/Tooltip.html.jinja' %}
 					{% endwith %}
 				{% endif %}
 			</div>
 			<div>
-				{% include 'Navigation.html.jinja' %}
+				{% include 'components/Navigation.html.jinja' %}
 			</div>
 		</section>
 		<section class="flex-initial overflow-y-scroll">
 			{% for text_container in text_containers %}
 				{% with location_container=text_container %}
-					{% include 'LocationContainer.html.jinja' %}
+					{% include 'components/LocationContainer.html.jinja' %}
 				{% endwith %}
 			{% endfor %}
 		</section>
@@ -104,7 +104,7 @@
 			{% for comment in filtered_comments %}
 				{# Generate comment citation - this would typically be done server-side #}
 				{% set comment_citation = citation_prefix ~ ' ' ~ (comment.ctsUrn.integerCitations[0] | join('') if comment.ctsUrn else '') %}
-				{% include 'CollapsibleComment.html.jinja' %}
+				{% include 'components/CollapsibleComment.html.jinja' %}
 			{% endfor %}
 		</section>
 	</div>
