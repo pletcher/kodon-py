@@ -31,8 +31,25 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def get_db_session(db_path: Path):
-    """Create a database session."""
+def get_db_session(db_path: Path, create_if_missing: bool = False):
+    """Create a database session, optionally creating the database if it doesn't exist."""
+    from flask import Flask
+    from kodon_py.database import db, alembic
+
+    db_exists = db_path.exists()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Create a minimal Flask app to use Alembic for database setup
+    app = Flask(__name__)
+    app.config["SQLALCHEMY_ENGINES"] = {"default": f"sqlite:///{db_path}"}
+    db.init_app(app)
+    alembic.init_app(app)
+
+    if create_if_missing and not db_exists:
+        with app.app_context():
+            alembic.upgrade()
+        logger.info(f"Created database: {db_path}")
+
     engine = create_engine(f"sqlite:///{db_path}")
     session_factory = sessionmaker(bind=engine)
     return scoped_session(session_factory)
@@ -106,20 +123,15 @@ def parse_command(source_dir: Path, output_dir: Path):
 @click.option(
     "--db-path", "-d",
     type=click.Path(path_type=Path),
-    default=Path("instance/kodon-db.sqlite"),
-    help="Path to SQLite database (default: instance/kodon-db.sqlite)",
+    default=Path("kodon-db.sqlite"),
+    help="Path to SQLite database (default: kodon-db.sqlite)",
 )
 def load_command(json_dir: Path, db_path: Path):
     """Load parsed JSON files into the database. Skips documents that already exist."""
     json_dir = json_dir.resolve()
     db_path = db_path.resolve()
 
-    if not db_path.exists():
-        click.echo(f"Database not found: {db_path}")
-        click.echo("Run the Flask app first to initialize the database.")
-        return
-
-    db_session = get_db_session(db_path)
+    db_session = get_db_session(db_path, create_if_missing=True)
 
     json_files = list(json_dir.rglob("*.json"))
     total = len(json_files)
@@ -162,8 +174,8 @@ def load_command(json_dir: Path, db_path: Path):
 @click.option(
     "--db-path", "-d",
     type=click.Path(path_type=Path),
-    default=Path("instance/kodon-db.sqlite"),
-    help="Path to SQLite database (default: instance/kodon-db.sqlite)",
+    default=Path("kodon-db.sqlite"),
+    help="Path to SQLite database (default: kodon-db.sqlite)",
 )
 @click.pass_context
 def all_command(ctx, source_dir: Path, output_dir: Path, db_path: Path):
@@ -186,8 +198,8 @@ def all_command(ctx, source_dir: Path, output_dir: Path, db_path: Path):
 @click.option(
     "--db-path", "-d",
     type=click.Path(path_type=Path),
-    default=Path("instance/kodon-db.sqlite"),
-    help="Path to SQLite database (default: instance/kodon-db.sqlite)",
+    default=Path("kodon-db.sqlite"),
+    help="Path to SQLite database (default: kodon-db.sqlite)",
 )
 @click.option(
     "--verbose", "-v",
@@ -200,12 +212,7 @@ def status_command(source_dir: Path, output_dir: Path, db_path: Path, verbose: b
     output_dir = output_dir.resolve()
     db_path = db_path.resolve()
 
-    if not db_path.exists():
-        click.echo(f"Database not found: {db_path}")
-        click.echo("Run the Flask app first to initialize the database.")
-        return
-
-    db_session = get_db_session(db_path)
+    db_session = get_db_session(db_path, create_if_missing=True)
     status = get_ingestion_status(source_dir, output_dir, db_session)
     db_session.remove()
 

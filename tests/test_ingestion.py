@@ -188,13 +188,22 @@ class TestLoadJsonToDatabase:
         load_json_to_database(sample_json_file, db_session)
 
         elements = db_session.query(Element).all()
-        assert len(elements) == 1
-        assert elements[0].tagname == "p"
+        # 2 elements: the `p` element and the `text_run` element (text_runs are now stored as elements)
+        assert len(elements) == 2
+
+        p_element = next(e for e in elements if e.tagname == "p")
+        text_run_element = next(e for e in elements if e.tagname == "text_run")
+
+        assert p_element is not None
+        assert text_run_element is not None
+        assert text_run_element.parent_id == p_element.id
 
         tokens = db_session.query(Token).all()
         assert len(tokens) == 2
         assert tokens[0].text == "Test"
         assert tokens[1].text == "content"
+        # Tokens should be attached to the text_run element, not the p element
+        assert all(t.element_id == text_run_element.id for t in tokens)
 
     def test_skips_existing_document(self, sample_json_file, db_session):
         """Should skip loading if document already exists."""

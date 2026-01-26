@@ -29,7 +29,7 @@
 		{% endwith %}
 	{% endfor %}
 
-	{% if text_container.tagname in ['pb', 'lb'] %}
+	{% if text_container.tagname in ['lb', 'milestone', 'pb'] %}
 		<a href="#{{ text_container.n }}">{{ text_container.n }}</a>
 	{% endif %}
 

@@ -86,6 +86,18 @@ def save_element(
     # Process children
     for child in element.get("children", []):
         if child.get("tagname") == "text_run":
+            # Save text_run as an element so it can be properly ordered with siblings
+            text_run_element = Element(
+                attributes=None,
+                idx=child["index"],
+                parent_id=db_element.id,
+                tagname="text_run",
+                textpart_id=textpart_id,
+                urn=f"{element['urn']}#text_run[{child['index']}]",
+            )
+            db_session.add(text_run_element)
+            db_session.flush()
+
             # Save tokens in this text run
             for position, token in enumerate(child.get("tokens", [])):
                 db_token = Token(
@@ -95,8 +107,7 @@ def save_element(
                     urn=token["urn"],
                     whitespace=token.get("whitespace", False),
                 )
-
-                db_element.tokens.append(db_token)
+                text_run_element.tokens.append(db_token)
         else:
             # Recursively save child element
             save_element(db_session, document_urn, textpart_id_map, child, db_element.id)

@@ -7,15 +7,13 @@ from sqlalchemy.orm import joinedload
 from kodon_py.database import db, alembic, run_migrations, Element, Textpart
 
 
-def create_app(test_config=None, sqlite_database=None):
+def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
-    if sqlite_database is None:
-        sqlite_database = (
-            f"sqlite:///{os.path.join(app.instance_path, "kodon-db.sqlite")}"
-        )
+
+    default_db_path = os.path.abspath("kodon-db.sqlite")
     app.config.from_mapping(
         SECRET_KEY=os.getenv("FLASK_APP_SECRET_KEY", "dev"),
-        SQLALCHEMY_ENGINES={"default": sqlite_database},
+        SQLALCHEMY_ENGINES={"default": f"sqlite:///{default_db_path}"},
     )
 
     if test_config is None:
@@ -47,7 +45,6 @@ def create_app(test_config=None, sqlite_database=None):
         urn_parts = urn.rsplit(":", 1)
         document_urn = urn_parts[0]
         citation = urn_parts[1] if len(urn_parts) > 1 else ""
-
         citation_parts = citation.split(".") if citation else []
 
         if len(citation_parts) <= 1:
@@ -108,6 +105,20 @@ def create_app(test_config=None, sqlite_database=None):
 
 def element_to_dict(elements_by_textpart: dict, element: Element) -> dict:
     """Convert an Element to a dict structure for templates."""
+    # Handle text_run elements specially - they just contain tokens
+    if element.tagname == "text_run":
+        return {
+            "tagname": "text_run",
+            "tokens": [
+                {
+                    "text": token.text,
+                    "urn": token.urn,
+                    "whitespace": token.whitespace,
+                }
+                for token in sorted(element.tokens, key=lambda t: t.position)
+            ],
+        }
+
     result = {
         "tagname": element.tagname,
         "urn": element.urn,
@@ -117,20 +128,7 @@ def element_to_dict(elements_by_textpart: dict, element: Element) -> dict:
     if element.attributes:
         result.update(element.attributes)
 
-    for token in sorted(element.tokens, key=lambda t: t.position):
-        if (
-            not result["children"]
-            or result["children"][-1].get("tagname") != "text_run"
-        ):
-            result["children"].append({"tagname": "text_run", "tokens": []})
-        result["children"][-1]["tokens"].append(
-            {
-                "text": token.text,
-                "urn": token.urn,
-                "whitespace": token.whitespace,
-            }
-        )
-
+    # Get all child elements (including text_runs) and sort by idx
     children = [
         e
         for e in elements_by_textpart.get(element.textpart_id, [])

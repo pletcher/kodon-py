@@ -102,26 +102,31 @@ class TestParseCommand:
 class TestLoadCommand:
     """Tests for the load command."""
 
-    def test_load_requires_database(self, cli_runner, temp_dir):
-        """Should error when database doesn't exist."""
-        nonexistent_db = temp_dir / "nonexistent.sqlite"
+    def test_load_creates_database(self, cli_runner, temp_dir, sample_json_file):
+        """Should create database if it doesn't exist."""
+        db_path = temp_dir / "new_db.sqlite"
+        json_dir = sample_json_file.parent
+
+        assert not db_path.exists()
 
         result = cli_runner.invoke(
             cli,
-            ["ingest", "load", "-d", str(nonexistent_db)],
+            ["ingest", "load", "-j", str(json_dir), "-d", str(db_path)],
         )
 
-        assert result.exit_code == 0  # Graceful exit
-        assert "Database not found" in result.output
+        assert result.exit_code == 0
+        assert db_path.exists()
+        assert "Loaded: 1" in result.output
 
-    def test_load_requires_json_files(self, cli_runner, initialized_db, temp_dir):
+    def test_load_requires_json_files(self, cli_runner, temp_dir):
         """Should error when no JSON files exist."""
         empty_json_dir = temp_dir / "empty_json"
         empty_json_dir.mkdir()
+        db_path = temp_dir / "test.sqlite"
 
         result = cli_runner.invoke(
             cli,
-            ["ingest", "load", "-j", str(empty_json_dir), "-d", str(initialized_db)],
+            ["ingest", "load", "-j", str(empty_json_dir), "-d", str(db_path)],
         )
 
         assert result.exit_code == 0  # Graceful exit

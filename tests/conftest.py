@@ -96,6 +96,7 @@ def sample_parsed_data():
                 "children": [
                     {
                         "tagname": "text_run",
+                        "index": 1,
                         "tokens": [
                             {
                                 "text": "Test",
