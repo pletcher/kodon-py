@@ -63,7 +63,9 @@ def parse_command(source_dir: Path, output_dir: Path):
     source_dir = source_dir.resolve()
     output_dir = output_dir.resolve()
 
-    tei_files = list(discover_tei_files(source_dir))
+    tei_files = [
+        t for t in list(discover_tei_files(source_dir)) if "__cts__" not in t.name
+    ]
     total = len(tei_files)
 
     if total == 0:

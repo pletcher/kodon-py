@@ -6,13 +6,16 @@ from sqlalchemy.orm import joinedload
 
 from kodon_py.database import db, alembic, run_migrations, Element, Textpart
 
-def create_app(test_config=None):
+
+def create_app(test_config=None, sqlite_database=None):
     app = Flask(__name__, instance_relative_config=True)
+    if sqlite_database is None:
+        sqlite_database = (
+            f"sqlite:///{os.path.join(app.instance_path, "kodon-db.sqlite")}"
+        )
     app.config.from_mapping(
         SECRET_KEY=os.getenv("FLASK_APP_SECRET_KEY", "dev"),
-        SQLALCHEMY_ENGINES={
-            "default": f"sqlite:///{os.path.join(app.instance_path, "kodon-db.sqlite")}"
-        },
+        SQLALCHEMY_ENGINES={"default": sqlite_database},
     )
 
     if test_config is None:
@@ -32,7 +35,6 @@ def create_app(test_config=None):
     alembic.init_app(app)
     run_migrations(app)
 
-    # a simple page that says hello
     @app.route("/hello")
     def hello():
         return "Hello, World!"
@@ -75,43 +77,25 @@ def create_app(test_config=None):
         for element in elements:
             elements_by_textpart.setdefault(element.textpart_id, []).append(element)
 
-        def element_to_dict(element: Element) -> dict:
-            """Convert an Element to a dict structure for templates."""
-            result = {
-                "tagname": element.tagname,
-                "urn": element.urn,
-                "children": [],
-            }
-
-            if element.attributes:
-                result.update(element.attributes)
-
-            for token in sorted(element.tokens, key=lambda t: t.position):
-                if not result["children"] or result["children"][-1].get("tagname") != "text_run":
-                    result["children"].append({"tagname": "text_run", "tokens": []})
-                result["children"][-1]["tokens"].append({
-                    "text": token.text,
-                    "urn": token.urn,
-                    "whitespace": token.whitespace,
-                })
-
-            children = [e for e in elements_by_textpart.get(element.textpart_id, [])
-                        if e.parent_id == element.id]
-            for child in sorted(children, key=lambda e: e.idx):
-                result["children"].append(element_to_dict(child))
-
-            return result
-
         text_containers = []
         for textpart in textparts:
             top_level_elements = sorted(
-                [e for e in elements_by_textpart.get(textpart.id, []) if e.parent_id is None],
-                key=lambda e: e.idx
+                [
+                    e
+                    for e in elements_by_textpart.get(textpart.id, [])
+                    if e.parent_id is None
+                ],
+                key=lambda e: e.idx,
             )
-            text_containers.append({
-                "urn": textpart.urn,
-                "children": [element_to_dict(e) for e in top_level_elements],
-            })
+            text_containers.append(
+                {
+                    "urn": textpart.urn,
+                    "children": [
+                        element_to_dict(elements_by_textpart, e)
+                        for e in top_level_elements
+                    ],
+                }
+            )
 
         return render_template(
             "components/ReadingEnvironment.html.jinja",
@@ -120,3 +104,39 @@ def create_app(test_config=None):
         )
 
     return app
+
+
+def element_to_dict(elements_by_textpart: dict, element: Element) -> dict:
+    """Convert an Element to a dict structure for templates."""
+    result = {
+        "tagname": element.tagname,
+        "urn": element.urn,
+        "children": [],
+    }
+
+    if element.attributes:
+        result.update(element.attributes)
+
+    for token in sorted(element.tokens, key=lambda t: t.position):
+        if (
+            not result["children"]
+            or result["children"][-1].get("tagname") != "text_run"
+        ):
+            result["children"].append({"tagname": "text_run", "tokens": []})
+        result["children"][-1]["tokens"].append(
+            {
+                "text": token.text,
+                "urn": token.urn,
+                "whitespace": token.whitespace,
+            }
+        )
+
+    children = [
+        e
+        for e in elements_by_textpart.get(element.textpart_id, [])
+        if e.parent_id == element.id
+    ]
+    for child in sorted(children, key=lambda e: e.idx):
+        result["children"].append(element_to_dict(elements_by_textpart, child))
+
+    return result

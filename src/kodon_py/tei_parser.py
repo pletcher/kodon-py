@@ -35,6 +35,8 @@ from xml.sax import xmlreader
 from xml.sax.handler import ContentHandler
 
 import lxml.sax  # pyright: ignore
+import stanza
+
 from lxml import etree
 
 NAMESPACES = {"tei": "http://www.tei-c.org/ns/1.0"}
@@ -126,8 +128,6 @@ class TEIParser(ContentHandler):
     as strings for later parsing and use.
     """
     def __init__(self, filename: Path | str):
-        import stanza
-
         self.greek_tokenizer = stanza.Pipeline(
             "grc",
             processors="tokenize",
@@ -160,6 +160,7 @@ class TEIParser(ContentHandler):
 
         self.element_stack = []
         self.elements = []
+        self.global_element_index = 0
         self.textpart_labels = []
         self.textpart_stack = []
         self.textparts = []
@@ -204,7 +205,7 @@ class TEIParser(ContentHandler):
         tokens = self.tokenize(content)
         text_run = self.process_tokens(tokens)
 
-        if len(text_run) > 0:
+        if text_run is not None:
             parent_element["children"].append(text_run)
 
     def determine_location(self, attrs: dict):
@@ -322,13 +323,17 @@ class TEIParser(ContentHandler):
                 1
                 for el in self.elements + self.element_stack
                 if el["textpart_urn"] == self.current_textpart_urn
+                and el["tagname"] == tagname
             ]
         )
+
+        element_index = self.global_element_index
+        self.global_element_index += 1
 
         attrs.update(
             {
                 "children": [],
-                "index": len(self.element_stack) + len(self.elements),
+                "index": element_index,
                 "tagname": tagname,
                 "textpart_index": textpart_index,
                 "textpart_urn": self.current_textpart_urn,
@@ -382,7 +387,11 @@ class TEIParser(ContentHandler):
 
             text_run.append(token)
 
-        return {"tagname": "text_run", "tokens": text_run}
+        if len(text_run) > 0:
+            element_index = self.global_element_index
+            self.global_element_index += 1
+
+            return {"tagname": "text_run", "tokens": text_run, "index": element_index}
 
     def startElementNS(
         self,
