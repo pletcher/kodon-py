@@ -22,16 +22,16 @@ def upgrade() -> None:
     """Create all tables."""
     # Documents table
     op.create_table(
-        'documents',
-        sa.Column('id', sa.Integer(), primary_key=True),
-        sa.Column('editionStmt', sa.String(), nullable=False),
-        sa.Column('language', sa.String(), nullable=False),
-        sa.Column('publicationStmt', sa.String(), nullable=False),
-        sa.Column('respStmt', sa.String(), nullable=False),
-        sa.Column('sourceDesc', sa.String(), nullable=False),
-        sa.Column('textgroup', sa.String(), nullable=False),
-        sa.Column('title', sa.String(), nullable=False),
-        sa.Column('urn', sa.String(), nullable=False, unique=True),
+        "documents",
+        sa.Column("id", sa.Integer(), primary_key=True),
+        sa.Column("editionStmt", sa.String(), nullable=True),
+        sa.Column("language", sa.String(), nullable=False),
+        sa.Column("publicationStmt", sa.String(), nullable=True),
+        sa.Column("respStmt", sa.String(), nullable=True),
+        sa.Column("sourceDesc", sa.String(), nullable=False),
+        sa.Column("textgroup", sa.String(), nullable=False),
+        sa.Column("title", sa.String(), nullable=False),
+        sa.Column("urn", sa.String(), nullable=False, unique=True),
     )
 
     # Textparts table

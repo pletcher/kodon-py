@@ -128,22 +128,9 @@ class TEIParser(ContentHandler):
     as strings for later parsing and use.
     """
     def __init__(self, filename: Path | str):
-        self.greek_tokenizer = stanza.Pipeline(
-            "grc",
-            processors="tokenize",
-            package="perseus",
-            model_dir="./stanza_models",
-            download_method=stanza.DownloadMethod.REUSE_RESOURCES,
-        )
-        self.latin_tokenizer = stanza.Pipeline(
-            "la",
-            processors="tokenize",
-            package="perseus",
-            model_dir="./stanza_models",
-            download_method=stanza.DownloadMethod.REUSE_RESOURCES,
-        )
-
+        self.filename = filename
         self.tree = etree.parse(filename)
+        self.tokenizer = None
 
         self.author = self.get_author()
         self.editionStmt = self.get_editionStmt()
@@ -267,19 +254,19 @@ class TEIParser(ContentHandler):
         return self.get_stringifiedXML("editionStmt")
 
     def get_publicationStmt(self):
-        return self.get_stringifiedXML("publicationStmt", False)
+        return self.get_stringifiedXML("publicationStmt")
 
     def get_respStmt(self):
-        return self.get_stringifiedXML("respStmt", False)
+        return self.get_stringifiedXML("respStmt")
 
     def get_sourceDesc(self):
-        return self.get_stringifiedXML("sourceDesc")
+        return self.get_stringifiedXML("sourceDesc", required=True)
 
-    def get_stringifiedXML(self, tagname: str, required=True):
+    def get_stringifiedXML(self, tagname: str, required=False):
         el = self.tree.find(f".//tei:{tagname}", namespaces=NAMESPACES)
 
         if required and el is None:
-            raise ValueError(f"{tagname} is required! {self.urn}")
+            raise ValueError(f"{tagname} is required! {self.filename}")
 
         if el is not None:
             return etree.tostring(el, encoding="unicode", xml_declaration=False)
@@ -351,6 +338,24 @@ class TEIParser(ContentHandler):
             self.element_stack[-1]["children"].append(attrs)
 
         self.element_stack.append(attrs)
+
+    def initialize_tokenizer(self):
+        if self.language == "grc":
+            self.tokenizer = stanza.Pipeline(
+                "grc",
+                processors="tokenize",
+                package="perseus",
+                model_dir="./stanza_models",
+                download_method=stanza.DownloadMethod.REUSE_RESOURCES,
+            )
+        elif self.language in ("la", "lat"):
+            self.tokenizer = stanza.Pipeline(
+                "la",
+                processors="tokenize",
+                package="perseus",
+                model_dir="./stanza_models",
+                download_method=stanza.DownloadMethod.REUSE_RESOURCES,
+            )
 
     def process_tokens(self, tokens):
         text_run = []
@@ -427,6 +432,7 @@ class TEIParser(ContentHandler):
                 | "num"
                 | "p"
                 | "pb"
+                | "q"
                 | "quote"
                 | "sic"
             ):
@@ -439,13 +445,10 @@ class TEIParser(ContentHandler):
                 self.handle_element(localname, clean_attrs)
 
     def tokenize(self, s: str):
-        doc = None
+        if self.tokenizer is None:
+            self.initialize_tokenizer()
 
-        if self.language == "grc":
-            doc = self.greek_tokenizer(s)
-
-        elif self.language == "la":
-            doc = self.latin_tokenizer(s)
+        doc = self.tokenizer(s)
 
         if doc is None:
             return []

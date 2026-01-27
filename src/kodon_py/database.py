@@ -26,10 +26,10 @@ class Document(Model):
     __tablename__ = "documents"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    editionStmt: Mapped[str]
+    editionStmt: Mapped[Optional[str]]
     language: Mapped[str]
-    publicationStmt: Mapped[str]
-    respStmt: Mapped[str]
+    publicationStmt: Mapped[Optional[str]]
+    respStmt: Mapped[Optional[str]]
     sourceDesc: Mapped[str]
     textgroup: Mapped[str]
     textparts: Mapped[List["Textpart"]] = relationship(back_populates="document")
